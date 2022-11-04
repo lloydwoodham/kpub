@@ -95,10 +95,7 @@ def plot_by_year(db,
                facecolor=colors[0],
                width=barwidth)
     if mission != 'kepler':
-        if mission == 'k2':
-            bottom = None
-        else:
-            bottom = list(counts['kepler'].values())
+        bottom = None if mission == 'k2' else list(counts['kepler'].values())
         pl.bar(np.array(list(counts['k2'].keys())),
                list(counts['k2'].values()),
                bottom=bottom,
@@ -144,7 +141,7 @@ def plot_by_year(db,
     # Only show horizontal grid lines
     ax.grid(axis='y')
     pl.tight_layout(rect=(0, 0, 1, 0.95), h_pad=1.5)
-    log.info("Writing {}".format(output_fn))
+    log.info(f"Writing {output_fn}")
     pl.savefig(output_fn, dpi=dpi)
     pl.close()
 
@@ -194,7 +191,7 @@ def plot_science_piechart(db, output_fn="kpub-piechart.pdf", dpi=200):
 
     pl.axis('equal')  # required to ensure pie chart has equal aspect ratio
     pl.tight_layout(rect=(0, 0, 1, 0.85), h_pad=1.5)
-    log.info("Writing {}".format(output_fn))
+    log.info(f"Writing {output_fn}")
     pl.savefig(output_fn, dpi=dpi)
     pl.close()
 
@@ -272,7 +269,7 @@ def plot_author_count(db,
     # Only show horizontal grid lines
     ax.grid(axis='y')
     pl.tight_layout(rect=(0, 0, 1, 0.98), h_pad=1.5)
-    log.info("Writing {}".format(output_fn))
+    log.info(f"Writing {output_fn}")
     pl.savefig(output_fn, dpi=dpi)
     pl.close()
 

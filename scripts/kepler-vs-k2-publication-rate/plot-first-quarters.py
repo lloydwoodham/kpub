@@ -147,7 +147,7 @@ if __name__ == "__main__":
     ax.grid(axis='y')
 
     #plt.tight_layout(h_pad=1.5)
-    log.info("Writing {}".format(output_fn))
+    log.info(f"Writing {output_fn}")
     plt.savefig(output_fn, dpi=dpi)
     plt.close()
 

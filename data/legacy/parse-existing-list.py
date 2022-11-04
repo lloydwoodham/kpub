@@ -3,7 +3,7 @@ import re
 
 def get_bibcodes(filename):
     bibcodes = []
-    for line in open(filename, 'r').readlines():
+    for line in open(filename, 'r'):
         matches = re.findall('.*/abs/([^"]+)">.*', line)
         if len(matches) > 0:
             code = matches[0]
@@ -23,9 +23,9 @@ if __name__ == '__main__':
                   "2014arXiv1403.5888P",
                   "2014arXiv1402.5163H"]
     for science in ['Exoplanets', 'Astrophysics']:
-        bibcodes = get_bibcodes('Publications{}.shtml'.format(science))
+        bibcodes = get_bibcodes(f'Publications{science}.shtml')
         for code in bibcodes:
             mission = "kepler"
             if code in k2bibcodes:
                 mission = "k2"
-            print("{},{},{}".format(code, mission, science.lower()))
+            print(f"{code},{mission},{science.lower()}")

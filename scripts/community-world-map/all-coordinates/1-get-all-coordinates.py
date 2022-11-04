@@ -18,7 +18,7 @@ time.sleep(2)
 
 
 def geolocate(geostring):
-    print("Querying {}".format(geostring))
+    print(f"Querying {geostring}")
     location = geolocator.geocode(geostring, timeout=10)
     country_short = [c['short_name'] for c in location.raw['address_components']
                      if ('country' in c['types'])][0]
@@ -32,40 +32,32 @@ def geolocate(geostring):
 
 
 
-out = open(OUTPUT_FN, "w")
-out.write("bibcode,year,pubdate,citation_count,mission,science,lon,lat,country_short,country_long,geostring\n")
+with open(OUTPUT_FN, "w") as out:
+    out.write("bibcode,year,pubdate,citation_count,mission,science,lon,lat,country_short,country_long,geostring\n")
 
-# Obtain the first author affiliations from kpub
-db = kpub.PublicationDB()
-all_publications = db.get_all()
-for publication in tqdm(all_publications):
-    affiliations = publication['aff']
+    # Obtain the first author affiliations from kpub
+    db = kpub.PublicationDB()
+    all_publications = db.get_all()
+    for publication in tqdm(all_publications):
+        affiliations = publication['aff']
 
-    aff = affiliations[0]
-    # Help the geolocator by only passing on the final components of the address
-    geostring = ",".join(aff.split(";")[-1].split(",")[-2:]).strip(" ;,-")
-   
-    try:
-        if len(geostring) > 0:
-            if geostring in MEMO:
-                gl = MEMO[geostring]
-            else:
-                time.sleep(0.2)
-                gl = geolocate(geostring)
-                MEMO[geostring] = gl
+        aff = affiliations[0]
+        # Help the geolocator by only passing on the final components of the address
+        geostring = ",".join(aff.split(";")[-1].split(",")[-2:]).strip(" ;,-")
 
-            outstring = "{},{},{},{},{},{},{},{},{},{},{}\n".format(
-                publication['bibcode'], publication['year'],
-                publication['pubdate'], publication['citation_count'],
-                publication['mission'], publication['science'],
-                gl['lon'], gl['lat'],
-                gl['country_short'], gl['country_long'],
-                gl['geostring'].replace(",", ";"))
+        try:
+            if geostring != "":
+                if geostring in MEMO:
+                    gl = MEMO[geostring]
+                else:
+                    time.sleep(0.2)
+                    gl = geolocate(geostring)
+                    MEMO[geostring] = gl
 
-            out.write(outstring)
-            out.flush()
-    except Exception as e:
-        print("Warning: failed to geolocate {} (exception: {})".format(geostring, e))
-        pass
-    
-out.close()
+                outstring = f"""{publication['bibcode']},{publication['year']},{publication['pubdate']},{publication['citation_count']},{publication['mission']},{publication['science']},{gl['lon']},{gl['lat']},{gl['country_short']},{gl['country_long']},{gl['geostring'].replace(",", ";")}\n"""
+
+
+                out.write(outstring)
+                out.flush()
+        except Exception as e:
+            print(f"Warning: failed to geolocate {geostring} (exception: {e})")

@@ -130,6 +130,6 @@ ax.grid(axis='y')
 pl.xlabel("Year")
 
 pl.tight_layout(rect=(0, 0, 1, 0.98), h_pad=1.5)
-log.info("Writing {}".format(output_fn))
+log.info(f"Writing {output_fn}")
 pl.savefig(output_fn, dpi=200)
 pl.close()
