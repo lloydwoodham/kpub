@@ -91,9 +91,9 @@ class PublicationDB(object):
         article : `ads.Article` object.
             An article object as returned by `ads.SearchQuery`.
         """
-        log.debug('Ingesting {}'.format(article.bibcode))
+        log.debug(f'Ingesting {article.bibcode}')
         # Also store the extra metadata in the json string
-        month = article.pubdate[0:7]
+        month = article.pubdate[:7]
         article._raw['mission'] = mission
         article._raw['science'] = science
         try:
@@ -103,10 +103,10 @@ class PublicationDB(object):
                                     article.year, month, article.pubdate,
                                     mission, science,
                                     json.dumps(article._raw)])
-            log.info('Inserted {} row(s).'.format(cur.rowcount))
+            log.info(f'Inserted {cur.rowcount} row(s).')
             self.con.commit()
         except sql.IntegrityError:
-            log.warning('{} was already ingested.'.format(article.bibcode))
+            log.warning(f'{article.bibcode} was already ingested.')
 
     def add_interactively(self, article, statusmsg=""):
         """Adds an article by prompting the user for the classification.
@@ -117,12 +117,11 @@ class PublicationDB(object):
         """
         # Do not show an article that is already in the database
         if article in self:
-            log.info("{} is already in the database "
-                     "-- skipping.".format(article.bibcode))
+            log.info(f"{article.bibcode} is already in the database -- skipping.")
             return
 
         # Print paper information to stdout
-        print(chr(27) + "[2J")  # Clear screen
+        print(f"{chr(27)}[2J")
         print(statusmsg)
         display_abstract(article._raw)
 
@@ -158,26 +157,25 @@ class PublicationDB(object):
             log.error("This action requires the ADS key to be setup.")
             return
 
-        q = ads.SearchQuery(q="identifier:{}".format(bibcode), fl=FIELDS)
+        q = ads.SearchQuery(q=f"identifier:{bibcode}", fl=FIELDS)
         for article in q:
             # Print useful warnings
             if bibcode != article.bibcode:
-                log.warning("Requested {} but ADS API returned {}".format(bibcode, article.bibcode))
+                log.warning(f"Requested {bibcode} but ADS API returned {article.bibcode}")
             if interactive and ('NONARTICLE' in article.property):
                 # Note: data products are sometimes tagged as NONARTICLE
-                log.warning("{} is not an article.".format(article.bibcode))
+                log.warning(f"{article.bibcode} is not an article.")
 
             if article in self:
-                log.warning("{} is already in the db.".format(article.bibcode))
+                log.warning(f"{article.bibcode} is already in the db.")
+            elif interactive:
+                self.add_interactively(article)
             else:
-                if interactive:
-                    self.add_interactively(article)
-                else:
-                    self.add(article, **kwargs)
+                self.add(article, **kwargs)
 
     def delete_by_bibcode(self, bibcode):
         cur = self.con.execute("DELETE FROM pubs WHERE bibcode = ?;", [bibcode])
-        log.info('Deleted {} row(s).'.format(cur.rowcount))
+        log.info(f'Deleted {cur.rowcount} row(s).')
         self.con.commit()
 
     def __contains__(self, article):
@@ -206,22 +204,22 @@ class PublicationDB(object):
         if mission is None:
             where = "(mission = 'kepler' OR mission = 'k2') "
         else:
-            where = "(mission = '{}') ".format(mission)
+            where = f"(mission = '{mission}') "
 
         if science is not None:
-            where += " AND science = '{}' ".format(science)
+            where += f" AND science = '{science}' "
 
         if year is not None:
             if isinstance(year, (list, tuple)):  # Multiple years?
-                str_year = ["'{}'".format(y) for y in year]
+                str_year = [f"'{y}'" for y in year]
                 where += " AND year IN (" + ", ".join(str_year) + ")"
             else:
-                where += " AND year = '{}' ".format(year)
+                where += f" AND year = '{year}' "
 
-        cur = self.con.execute("SELECT year, month, metrics, bibcode "
-                               "FROM pubs "
-                               "WHERE {} "
-                               "ORDER BY date DESC; ".format(where))
+        cur = self.con.execute(
+            f"SELECT year, month, metrics, bibcode FROM pubs WHERE {where} ORDER BY date DESC; "
+        )
+
         return cur.fetchall()
 
     def get_metadata(self, bibcode):
@@ -233,16 +231,12 @@ class PublicationDB(object):
                     group_by_month=False, save_as=None, **kwargs):
         """Returns the publication list in markdown format.
         """
-        if group_by_month:
-            group_idx = 1
-        else:
-            group_idx = 0  # by year
-
+        group_idx = 1 if group_by_month else 0
         articles = collections.OrderedDict({})
         for row in self.query(**kwargs):
             group = row[group_idx]
             if group.endswith("-00"):
-                group = group[:-3] + "-01"
+                group = f"{group[:-3]}-01"
             if group not in articles:
                 articles[group] = []
             art = json.loads(row[2])
@@ -256,10 +250,7 @@ class PublicationDB(object):
         template = env.get_template('template.md')
         markdown = template.render(title=title, save_as=save_as,
                                    articles=articles)
-        if sys.version_info >= (3, 0):
-            return markdown  # Python 3
-        else:
-            return markdown.encode("utf-8")  # Python 2
+        return markdown if sys.version_info >= (3, 0) else markdown.encode("utf-8")
 
     def save_markdown(self, output_fn, **kwargs):
         """Saves the database to a text file in markdown format.
@@ -271,30 +262,33 @@ class PublicationDB(object):
         """
         markdown = self.to_markdown(save_as=output_fn.replace("md", "html"),
                                     **kwargs)
-        log.info('Writing {}'.format(output_fn))
-        f = open(output_fn, 'w')
-        f.write(markdown)
-        f.close()
+        log.info(f'Writing {output_fn}')
+        with open(output_fn, 'w') as f:
+            f.write(markdown)
 
     def plot(self):
         """Saves beautiful plot of the database."""
         for extension in ['pdf', 'png']:
-            plot.plot_by_year(self,
-                              "kpub-publication-rate.{}".format(extension))
-            plot.plot_by_year(self,
-                              "kpub-publication-rate-kepler.{}".format(extension),
-                              mission='kepler')
-            plot.plot_by_year(self,
-                              "kpub-publication-rate-k2.{}".format(extension),
-                              first_year=2014,
-                              mission='k2')
-            plot.plot_by_year(self,
-                              "kpub-publication-rate-without-extrapolation.{}".format(extension),
-                              extrapolate=False)
-            plot.plot_science_piechart(self,
-                                       "kpub-piechart.{}".format(extension))
-            plot.plot_author_count(self,
-                                   "kpub-author-count.{}".format(extension))
+            plot.plot_by_year(self, f"kpub-publication-rate.{extension}")
+            plot.plot_by_year(
+                self, f"kpub-publication-rate-kepler.{extension}", mission='kepler'
+            )
+
+            plot.plot_by_year(
+                self,
+                f"kpub-publication-rate-k2.{extension}",
+                first_year=2014,
+                mission='k2',
+            )
+
+            plot.plot_by_year(
+                self,
+                f"kpub-publication-rate-without-extrapolation.{extension}",
+                extrapolate=False,
+            )
+
+            plot.plot_science_piechart(self, f"kpub-piechart.{extension}")
+            plot.plot_author_count(self, f"kpub-author-count.{extension}")
 
     def get_metrics(self, year=None):
         """Returns a dictionary of overall publication statistics.
@@ -329,14 +323,14 @@ class PublicationDB(object):
             api_response = article[2]
             js = json.loads(api_response)
             metrics["publication_count"] += 1
-            metrics["{}_count".format(js["mission"])] += 1
+            metrics[f'{js["mission"]}_count'] += 1
             if "PhDT" in js["bibcode"]:
                 metrics["phd_count"] += 1
-                metrics["{}_phd_count".format(js["mission"])] += 1
+                metrics[f'{js["mission"]}_phd_count'] += 1
             try:
-                metrics["{}_count".format(js["science"])] += 1
+                metrics[f'{js["science"]}_count'] += 1
             except KeyError:
-                log.warning("{}: no science category".format(js["bibcode"]))
+                log.warning(f'{js["bibcode"]}: no science category')
             authors.extend(js["author_norm"])
             first_authors.append(js["first_author_norm"])
             if js["mission"] == 'k2':
@@ -348,14 +342,14 @@ class PublicationDB(object):
             try:
                 if "REFEREED" in js["property"]:
                     metrics["refereed_count"] += 1
-                    metrics["{}_refereed_count".format(js["mission"])] += 1
+                    metrics[f'{js["mission"]}_refereed_count'] += 1
             except TypeError:  # proprety is None
                 pass
             try:
                 metrics["citation_count"] += js["citation_count"]
-                metrics["{}_citation_count".format(js["mission"])] += js["citation_count"]
+                metrics[f'{js["mission"]}_citation_count'] += js["citation_count"]
             except (KeyError, TypeError):
-                log.warning("{}: no citation_count".format(js["bibcode"]))
+                log.warning(f'{js["bibcode"]}: no citation_count')
         metrics["author_count"] = np.unique(authors).size
         metrics["first_author_count"] = np.unique(first_authors).size
         metrics["kepler_author_count"] = np.unique(kepler_authors).size
@@ -364,7 +358,10 @@ class PublicationDB(object):
         metrics["k2_first_author_count"] = np.unique(k2_first_authors).size
         # Also compute fractions
         for frac in ["kepler", "k2", "exoplanets", "astrophysics"]:
-            metrics[frac+"_fraction"] = metrics[frac+"_count"] / metrics["publication_count"]
+            metrics[f"{frac}_fraction"] = (
+                metrics[f"{frac}_count"] / metrics["publication_count"]
+            )
+
         return metrics
 
     def get_all(self, mission=None, science=None):
@@ -384,7 +381,7 @@ class PublicationDB(object):
                 citations.append(0)
             else:
                 citations.append(js["citation_count"])
-        idx_top = np.argsort(citations)[::-1][0:top]
+        idx_top = np.argsort(citations)[::-1][:top]
         return [json.loads(articles[idx][2]) for idx in idx_top]
 
     def get_most_read(self, mission=None, science=None, top=10):
@@ -396,7 +393,7 @@ class PublicationDB(object):
             js = json.loads(api_response)
             bibcodes.append(article[3])
             citations.append(js["read_count"])
-        idx_top = np.argsort(citations)[::-1][0:top]
+        idx_top = np.argsort(citations)[::-1][:top]
         return [json.loads(articles[idx][2]) for idx in idx_top]
 
     def get_most_active_first_authors(self, min_papers=6):
@@ -447,9 +444,7 @@ class PublicationDB(object):
         # Initialize a dictionary to contain the data to plot
         result = {}
         for mission in MISSIONS:
-            result[mission] = {}
-            for year in range(year_begin, year_end + 1):
-                result[mission][year] = 0
+            result[mission] = {year: 0 for year in range(year_begin, year_end + 1)}
             cur = self.con.execute("SELECT year, COUNT(*) FROM pubs "
                                    "WHERE mission = ? "
                                    "AND year >= '2009' "
@@ -525,7 +520,7 @@ class PublicationDB(object):
             month = datetime.datetime.now().strftime("%Y-%m")
 
         # First show all the papers with the Kepler funding message in the ack
-        log.info("Querying ADS for acknowledgements (month={}).".format(month))
+        log.info(f"Querying ADS for acknowledgements (month={month}).")
         database = "astronomy"
         qry = ads.SearchQuery(q="""(ack:"Kepler mission"
                                     OR ack:"K2 mission"
@@ -539,14 +534,12 @@ class PublicationDB(object):
                               rows=9999999999)
         articles = list(qry)
         for idx, article in enumerate(articles):
-            statusmsg = ("Showing article {} out of {} that mentions Kepler "
-                         "in the acknowledgements.\n\n".format(
-                            idx+1, len(articles)))
+            statusmsg = f"Showing article {idx + 1} out of {len(articles)} that mentions Kepler in the acknowledgements.\n\n"
+
             self.add_interactively(article, statusmsg=statusmsg)
 
         # Then search for keywords in the title and abstracts
-        log.info("Querying ADS for titles and abstracts "
-                 "(month={}).".format(month))
+        log.info(f"Querying ADS for titles and abstracts (month={month}).")
         qry = ads.SearchQuery(q="""(
                                     abs:"Kepler"
                                     OR abs:"K2"
@@ -603,10 +596,9 @@ class PublicationDB(object):
                 ignore = True
 
             if not ignore:  # Propose to the user
-                statusmsg = '(Reviewing article {} out of {}.)\n\n'.format(
-                                idx+1, len(articles))
+                statusmsg = f'(Reviewing article {idx + 1} out of {len(articles)}.)\n\n'
                 self.add_interactively(article, statusmsg=statusmsg)
-        log.info('Finished reviewing all articles for {}.'.format(month))
+        log.info(f'Finished reviewing all articles for {month}.')
 
 
 ##################
@@ -689,22 +681,31 @@ def kpub(args=None):
             else:
                 suffix = ""
                 title_suffix = ""
-            output_fn = 'kpub{}.md'.format(suffix)
-            db.save_markdown(output_fn,
-                             group_by_month=bymonth,
-                             title="Kepler/K2 publications{}".format(title_suffix))
+            output_fn = f'kpub{suffix}.md'
+            db.save_markdown(
+                output_fn,
+                group_by_month=bymonth,
+                title=f"Kepler/K2 publications{title_suffix}",
+            )
+
             for science in SCIENCES:
-                output_fn = 'kpub-{}{}.md'.format(science, suffix)
-                db.save_markdown(output_fn,
-                                 group_by_month=bymonth,
-                                 science=science,
-                                 title="Kepler/K2 {} publications{}".format(science, title_suffix))
+                output_fn = f'kpub-{science}{suffix}.md'
+                db.save_markdown(
+                    output_fn,
+                    group_by_month=bymonth,
+                    science=science,
+                    title=f"Kepler/K2 {science} publications{title_suffix}",
+                )
+
             for mission in ['kepler', 'k2']:
-                output_fn = 'kpub-{}{}.md'.format(mission, suffix)
-                db.save_markdown(output_fn,
-                                 group_by_month=bymonth,
-                                 mission=mission,
-                                 title="{} publications{}".format(mission.capitalize(), title_suffix))
+                output_fn = f'kpub-{mission}{suffix}.md'
+                db.save_markdown(
+                    output_fn,
+                    group_by_month=bymonth,
+                    mission=mission,
+                    title=f"{mission.capitalize()} publications{title_suffix}",
+                )
+
 
         # Finally, produce an overview page
         templatedir = os.path.join(PACKAGEDIR, 'templates')
@@ -716,14 +717,12 @@ def kpub(args=None):
                                    now=datetime.datetime.now())
         # most_read=db.get_most_read(20),
         filename = 'publications.md'
-        log.info('Writing {}'.format(filename))
-        f = open(filename, 'w')
-        if sys.version_info >= (3, 0):
-            f.write(markdown)  # Python 3
-        else:
-            f.write(markdown.encode("utf-8"))  # Legacy Python
-        f.close()
-
+        log.info(f'Writing {filename}')
+        with open(filename, 'w') as f:
+            if sys.version_info >= (3, 0):
+                f.write(markdown)  # Python 3
+            else:
+                f.write(markdown.encode("utf-8"))  # Legacy Python
     else:
         if args.exoplanets and not args.astrophysics:
             science = "exoplanets"
@@ -839,7 +838,7 @@ def kpub_import(args=None):
                 time.sleep(0.1)
                 break
             except Exception as e:
-                print("Warning: attempt #{} for {}: error '{}'".format(attempt, col[0], e))
+                print(f"Warning: attempt #{attempt} for {col[0]}: error '{e}'")
 
 
 def kpub_export(args=None):
@@ -919,9 +918,7 @@ def kpub_spreadsheet(args=None):
         spreadsheet.append(myrow)
 
     output_fn = 'kepler-publications.xls'
-    print('Writing {}'.format(output_fn))
+    print(f'Writing {output_fn}')
     pd.DataFrame(spreadsheet).to_excel(output_fn, index=False)
 
 
-if __name__ == '__main__':
-    pass

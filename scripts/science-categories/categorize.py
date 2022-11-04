@@ -1,5 +1,6 @@
 """Categorize publications into fine-grained categories
 """
+
 from pprint import pprint
 import pandas as pd
 import kpub
@@ -37,32 +38,29 @@ if __name__ == "__main__":
     except FileNotFoundError:
         classified_bibcodes = []
 
-    # Open db in append mode
-    out = open(FILENAME, 'a')
+    with open(FILENAME, 'a') as out:
+        db = kpub.PublicationDB()
+        pubs = db.get_all(mission="k2")
+        for idx, pub in enumerate(pubs):
+            # Skip articles already categorizes
+            if pub['bibcode'] in classified_bibcodes:
+                continue
 
-    db = kpub.PublicationDB()
-    pubs = db.get_all(mission="k2")
-    for idx, pub in enumerate(pubs):
-        # Skip articles already categorizes
-        if pub['bibcode'] in classified_bibcodes:
-            continue
+                    # Clear screen and show the article
+            print(f"{chr(27)}[2J")
+            print(f"Article {idx + 1} out of {len(pubs)}")
+            kpub.display_abstract(pub)
 
-        # Clear screen and show the article
-        print(chr(27) + "[2J")
-        print("Article {} out of {}".format(idx+1, len(pubs)))
-        kpub.display_abstract(pub)
+            # Prompt the user to classify the paper
+            print("Categories:")
+            pprint(CATEGORIES)
+            while True:
+                print("=> Enter code: ", end="")
+                prompt = input()
+                if prompt in CATEGORIES:
+                    out.write(f"{pub['bibcode']},{prompt}\n")
+                    out.flush()
+                    break
 
-        # Prompt the user to classify the paper
-        print("Categories:")
-        pprint(CATEGORIES)
-        while True:
-            print("=> Enter code: ", end="")
-            prompt = input()
-            if prompt not in CATEGORIES.keys():
-                print("Error: invalid category")
-            else:
-                out.write("{},{}\n".format(pub['bibcode'], prompt))
-                out.flush()
-                break
-
-    out.close()
+                else:
+                    print("Error: invalid category")

@@ -71,16 +71,16 @@ if __name__ == "__main__":
 
     # First collect the data
     k1_years = [2009, 2010, 2011, 2012, 2013, 2014]
-    k1_start = ["{}-01".format(yr) for yr in k1_years]
-    k1_stop = ["{}-01".format(yr+1) for yr in k1_years]
+    k1_start = [f"{yr}-01" for yr in k1_years]
+    k1_stop = [f"{yr + 1}-01" for yr in k1_years]
     k1_counts = []
     for idx, label in enumerate(k1_years):
         count = pubcount(db, mission="kepler", start=k1_start[idx], stop=k1_stop[idx])
         k1_counts.append(count)
 
     k2_years = [2014, 2015, 2016, 2017, 2018, 2019]
-    k2_start = ["{}-01".format(yr) for yr in k2_years]
-    k2_stop = ["{}-01".format(yr+1) for yr in k2_years]
+    k2_start = [f"{yr}-01" for yr in k2_years]
+    k2_stop = [f"{yr + 1}-01" for yr in k2_years]
     k2_stop[1] = "2050-01"
     k2_start[2] = "2050-01"
     k2_counts = []
@@ -151,11 +151,11 @@ if __name__ == "__main__":
 
     #plt.tight_layout(h_pad=1.5)
     output_fn = "kpub-first-years.pdf"
-    log.info("Writing {}".format(output_fn))
+    log.info(f"Writing {output_fn}")
     plt.savefig(output_fn, dpi=dpi)
-    
+
     output_fn = "kpub-first-years.png"
-    log.info("Writing {}".format(output_fn))
+    log.info(f"Writing {output_fn}")
     plt.savefig(output_fn, dpi=dpi)
 
     plt.close()
